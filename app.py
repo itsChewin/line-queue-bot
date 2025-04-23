@@ -1,5 +1,6 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+timestamp = datetime.now(timezone(timedelta(hours=7))).isoformat()
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
@@ -70,12 +71,20 @@ def handle_message(event):
     if msg == "book":
         if any(entry["user_id"] == user_id for entry in queue):
             position = next(i for i, entry in enumerate(queue) if entry["user_id"] == user_id)
-            reply = f"📌 You have already booked.\nYour queue position is {position + 1}."
+            reply = (
+                f"📌 You have already booked.\n\n"
+                f"🎟️ Queue Number: {position + 1}\n\n"
+                f"🕒 Time: {datetime.fromisoformat(queue[position]['time']).strftime('%H:%M')}"
+            )
         else:
-            timestamp = datetime.now().isoformat()
+            timestamp = datetime.now(timezone(timedelta(hours=7))).isoformat()
             queue.append({"user_id": user_id, "time": timestamp})
             save_queue()
-            reply = f"✅ Booking successful! 🎉\nYour queue number is {len(queue)}."
+            reply = (
+                f"✅ Booking successful! 🎉\n\n"
+                f"🎟️ Queue Number: {len(queue)}\n\n"
+                f"🕒 Time: {datetime.fromisoformat(timestamp).strftime('%H:%M')}"
+            )
 
     elif msg == "cancel":
         for i, entry in enumerate(queue):
@@ -90,10 +99,10 @@ def handle_message(event):
     elif msg == "queue":
         if queue:
             reply_lines = [
-                f"{i+1}. {'You' if entry['user_id'] == user_id else 'User'} at {entry['time'][11:16]}"
+                f"📌 Queue #{i+1}\n\n👤 {'You' if entry['user_id'] == user_id else 'User'}\n\n🕒 Time: {datetime.fromisoformat(entry['time']).strftime('%H:%M')}"
                 for i, entry in enumerate(queue)
             ]
-            reply = "📋 Current Queue:\n" + "\n".join(reply_lines)
+            reply = "📋 Current Queue:\n\n" + "\n\n".join(reply_lines)
         else:
             reply = "📭 No one is in the queue at the moment."
 
