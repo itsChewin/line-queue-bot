@@ -32,7 +32,7 @@ queue = []
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_id = event.source.user_id
-    msg = event.message.text.lower()
+    msg = event.message.text.strip().lower()
 
     if msg == "book":
         if user_id not in queue:
@@ -40,8 +40,23 @@ def handle_message(event):
             reply = f"✅ คุณได้ทำการจองคิวเรียบร้อยแล้ว 🎉\nคุณอยู่ในลำดับที่ {len(queue)}"
         else:
             reply = f"📌 คุณจองคิวไว้แล้ว\nลำดับของคุณคือ {queue.index(user_id) + 1}"
+
+    elif msg == "cancel":
+        if user_id in queue:
+            queue.remove(user_id)
+            reply = "❌ คุณได้ยกเลิกคิวเรียบร้อยแล้วครับ"
+        else:
+            reply = "❗️คุณยังไม่มีคิวที่จองไว้"
+
+    elif msg == "queue":
+        if queue:
+            reply_lines = [f"{i+1}. {'คุณ' if uid == user_id else 'ผู้ใช้'}" for i, uid in enumerate(queue)]
+            reply = "📋 รายชื่อคิวทั้งหมด:\n" + "\n".join(reply_lines)
+        else:
+            reply = "📭 ขณะนี้ยังไม่มีคิวใด ๆ เลย"
+
     else:
-        reply = "กรุณาพิมพ์ 'book' เพื่อจองคิว 🙏"
+        reply = "กรุณาพิมพ์ 'book' เพื่อจองคิว 🙏\nหรือ 'queue' เพื่อดูคิว\nหรือ 'cancel' เพื่อยกเลิกคิว"
 
     line_bot_api.reply_message(
         event.reply_token,
