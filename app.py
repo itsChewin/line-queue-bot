@@ -1,3 +1,5 @@
+import json
+from datetime import datetime
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
@@ -11,52 +13,96 @@ LINE_CHANNEL_SECRET = '90b66812b12a2ca40a2508d288b52273'
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
+queue_file = "queue.json"
+queue = []
+queue_date = datetime.now().date()
+
+# === Persistence ===
+def save_queue():
+    data = {
+        "queue": queue,
+        "date": str(queue_date)
+    }
+    with open(queue_file, "w") as f:
+        json.dump(data, f)
+
+def load_queue():
+    global queue, queue_date
+    try:
+        with open(queue_file, "r") as f:
+            data = json.load(f)
+            queue = data.get("queue", [])
+            queue_date = datetime.strptime(data.get("date"), "%Y-%m-%d").date()
+    except:
+        queue = []
+        queue_date = datetime.now().date()
+
+def check_reset_queue():
+    global queue, queue_date
+    today = datetime.now().date()
+    if today != queue_date:
+        queue = []
+        queue_date = today
+        save_queue()
+
+load_queue()
+
+# === LINE Webhook ===
 @app.route("/callback", methods=["POST"])
 def callback():
     signature = request.headers.get("X-Line-Signature")
     body = request.get_data(as_text=True)
-
-    print("📩 Body:", body)
-    print("🔑 Signature from LINE:", signature)
-
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
-        print("❌ Invalid signature.")
         abort(403)
-
     return "OK"
 
-queue = []
-
+# === Message Handler ===
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
+    check_reset_queue()
+
     user_id = event.source.user_id
     msg = event.message.text.strip().lower()
+    reply = ""
 
     if msg == "book":
-        if user_id not in queue:
-            queue.append(user_id)
-            reply = f"✅ คุณได้ทำการจองคิวเรียบร้อยแล้ว 🎉\nคุณอยู่ในลำดับที่ {len(queue)}"
+        if any(entry["user_id"] == user_id for entry in queue):
+            position = next(i for i, entry in enumerate(queue) if entry["user_id"] == user_id)
+            reply = f"📌 You have already booked.\nYour queue position is {position + 1}."
         else:
-            reply = f"📌 คุณจองคิวไว้แล้ว\nลำดับของคุณคือ {queue.index(user_id) + 1}"
+            timestamp = datetime.now().isoformat()
+            queue.append({"user_id": user_id, "time": timestamp})
+            save_queue()
+            reply = f"✅ Booking successful! 🎉\nYour queue number is {len(queue)}."
 
     elif msg == "cancel":
-        if user_id in queue:
-            queue.remove(user_id)
-            reply = "❌ คุณได้ยกเลิกคิวเรียบร้อยแล้วครับ"
+        for i, entry in enumerate(queue):
+            if entry["user_id"] == user_id:
+                queue.pop(i)
+                save_queue()
+                reply = "❌ Your booking has been canceled."
+                break
         else:
-            reply = "❗️คุณยังไม่มีคิวที่จองไว้"
+            reply = "⚠️ You don't have a booking to cancel."
 
     elif msg == "queue":
         if queue:
-            reply_lines = [f"{i+1}. {'คุณ' if uid == user_id else 'ผู้ใช้'}" for i, uid in enumerate(queue)]
-            reply = "📋 รายชื่อคิวทั้งหมด:\n" + "\n".join(reply_lines)
+            reply_lines = [
+                f"{i+1}. {'You' if entry['user_id'] == user_id else 'User'} at {entry['time'][11:16]}"
+                for i, entry in enumerate(queue)
+            ]
+            reply = "📋 Current Queue:\n" + "\n".join(reply_lines)
         else:
-            reply = "📭 ขณะนี้ยังไม่มีคิวใด ๆ เลย"
+            reply = "📭 No one is in the queue at the moment."
 
     else:
-        reply = "กรุณาพิมพ์ 'book' เพื่อจองคิว 🙏\nหรือ 'queue' เพื่อดูคิว\nหรือ 'cancel' เพื่อยกเลิกคิว"
+        reply = (
+            "Please type 'book' to reserve a queue slot 🙏\n"
+            "Type 'queue' to view the current queue\n"
+            "Type 'cancel' to cancel your booking"
+        )
 
     line_bot_api.reply_message(
         event.reply_token,
