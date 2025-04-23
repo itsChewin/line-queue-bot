@@ -1,6 +1,5 @@
 import json
 from datetime import datetime, timedelta, timezone
-timestamp = datetime.now(timezone(timedelta(hours=7))).isoformat()
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
@@ -70,20 +69,32 @@ def handle_message(event):
 
     if msg == "book":
         if any(entry["user_id"] == user_id for entry in queue):
-            position = next(i for i, entry in enumerate(queue) if entry["user_id"] == user_id)
+            entry = next(entry for entry in queue if entry["user_id"] == user_id)
+            position = next(i for i, e in enumerate(queue) if e["user_id"] == user_id)
+            queues_left = position
             reply = (
-                f"📌 You have already booked.\n\n"
-                f"🎟️ Queue Number: {position + 1}\n\n"
-                f"🕒 Time: {datetime.fromisoformat(queue[position]['time']).strftime('%H:%M')}"
+                "✨ *Booking Already Exists* ✨\n"
+                "-----------------------------\n"
+                f"🎟️ *Queue Number*: `{entry['number']}`\n"
+                f"🕒 *Time*: `{datetime.fromisoformat(entry['time']).strftime('%H:%M')}`\n"
+                f"📊 *Position in Queue*: `{queues_left}`\n"
+                "-----------------------------"
             )
         else:
             timestamp = datetime.now(timezone(timedelta(hours=7))).isoformat()
-            queue.append({"user_id": user_id, "time": timestamp})
+            last_number = (
+                max([int(entry["number"][1:]) for entry in queue], default=0) + 1
+            )
+            booking_number = f"A{last_number:04}"
+            queue.append({"user_id": user_id, "time": timestamp, "number": booking_number})
             save_queue()
             reply = (
-                f"✅ Booking successful! 🎉\n\n"
-                f"🎟️ Queue Number: {len(queue)}\n\n"
-                f"🕒 Time: {datetime.fromisoformat(timestamp).strftime('%H:%M')}"
+                "✅ *Booking Successful!* 🎉\n"
+                "-----------------------------\n"
+                f"🎟️ *Queue Number*: `{booking_number}`\n"
+                f"🧾 *Queues Ahead*: `{len(queue) - 1}`\n"
+                f"🕒 *Time*: `{datetime.fromisoformat(timestamp).strftime('%H:%M')}`\n"
+                "-----------------------------"
             )
 
     elif msg == "cancel":
@@ -91,26 +102,33 @@ def handle_message(event):
             if entry["user_id"] == user_id:
                 queue.pop(i)
                 save_queue()
-                reply = "❌ Your booking has been canceled."
+                reply = "❌ *Your booking has been canceled.*"
                 break
         else:
-            reply = "⚠️ You don't have a booking to cancel."
+            reply = "⚠️ *You don't have a booking to cancel.*"
 
     elif msg == "queue":
-        if queue:
-            reply_lines = [
-                f"📌 Queue #{i+1}\n\n👤 {'You' if entry['user_id'] == user_id else 'User'}\n\n🕒 Time: {datetime.fromisoformat(entry['time']).strftime('%H:%M')}"
-                for i, entry in enumerate(queue)
-            ]
-            reply = "📋 Current Queue:\n\n" + "\n\n".join(reply_lines)
+        entry = next((e for e in queue if e["user_id"] == user_id), None)
+        if entry:
+            position = next(i for i, e in enumerate(queue) if e["user_id"] == user_id)
+            if position == 0:
+                reply = (
+                    "🎟️ *Your Queue Number*: `{}`\n\n📌 *It's your time!!!* 🎉"
+                ).format(entry['number'])
+            else:
+                reply = (
+                    "🎟️ *Your Queue Number*: `{}`\n\n"
+                    "🧾 *Queues Ahead*: `{}`"
+                ).format(entry['number'], position)
         else:
-            reply = "📭 No one is in the queue at the moment."
+            reply = "❗ *You don't have a booking yet.*\nType 'book' to reserve."
 
     else:
         reply = (
-            "Please type 'book' to reserve a queue slot 🙏\n"
-            "Type 'queue' to view the current queue\n"
-            "Type 'cancel' to cancel your booking"
+            "🤖 *LINE Queue Bot Commands:*\n"
+            "- Type `book` to reserve a slot\n"
+            "- Type `queue` to view your position\n"
+            "- Type `cancel` to cancel your booking"
         )
 
     line_bot_api.reply_message(
