@@ -73,11 +73,11 @@ def handle_message(event):
             position = next(i for i, e in enumerate(queue) if e["user_id"] == user_id)
             queues_left = position
             reply = (
-                "✨ *Booking Already Exists* ✨\n"
+                "✨ Booking Already Exists ✨\n"
                 "-----------------------------\n"
-                f"🎟️ *Queue Number*: `{entry['number']}`\n"
-                f"🕒 *Time*: `{datetime.fromisoformat(entry['time']).strftime('%H:%M')}`\n"
-                f"📊 *Position in Queue*: `{queues_left}`\n"
+                f"🎟️ Queue Number: {entry['number']}\n"
+                f"🕒 Time: {datetime.fromisoformat(entry['time']).strftime('%H:%M')}\n"
+                f"📊 Position in Queue: {queues_left}\n"
                 "-----------------------------"
             )
         else:
@@ -89,11 +89,11 @@ def handle_message(event):
             queue.append({"user_id": user_id, "time": timestamp, "number": booking_number})
             save_queue()
             reply = (
-                "✅ *Booking Successful!* 🎉\n"
+                "✅ Booking Successful! 🎉\n"
                 "-----------------------------\n"
-                f"🎟️ *Queue Number*: `{booking_number}`\n"
-                f"🧾 *Queues Ahead*: `{len(queue) - 1}`\n"
-                f"🕒 *Time*: `{datetime.fromisoformat(timestamp).strftime('%H:%M')}`\n"
+                f"🎟️ Queue Number: {booking_number}\n"
+                f"🧾 Queues Ahead: {len(queue) - 1}\n"
+                f"🕒 Time: {datetime.fromisoformat(timestamp).strftime('%H:%M')}\n"
                 "-----------------------------"
             )
 
@@ -102,10 +102,10 @@ def handle_message(event):
             if entry["user_id"] == user_id:
                 queue.pop(i)
                 save_queue()
-                reply = "❌ *Your booking has been canceled.*"
+                reply = "❌ Your booking has been canceled."
                 break
         else:
-            reply = "⚠️ *You don't have a booking to cancel.*"
+            reply = "⚠️ You don't have a booking to cancel."
 
     elif msg == "queue":
         entry = next((e for e in queue if e["user_id"] == user_id), None)
@@ -113,19 +113,19 @@ def handle_message(event):
             position = next(i for i, e in enumerate(queue) if e["user_id"] == user_id)
             if position == 0:
                 reply = (
-                    "🎟️ *Your Queue Number*: `{}`\n\n📌 *It's your time!!!* 🎉"
+                    "🎟️ Your Queue Number: {}\n\n📌 It's your time!!! 🎉"
                 ).format(entry['number'])
             else:
                 reply = (
-                    "🎟️ *Your Queue Number*: `{}`\n\n"
-                    "🧾 *Queues Ahead*: `{}`"
+                    "🎟️ Your Queue Number: {}\n\n"
+                    "🧾 Queues Ahead: {}"
                 ).format(entry['number'], position)
         else:
-            reply = "❗ *You don't have a booking yet.*\nType 'book' to reserve."
+            reply = "❗ You don't have a booking yet.\nType 'book' to reserve."
 
     else:
         reply = (
-            "🤖 *LINE Queue Bot Commands:*\n"
+            "🤖 LINE Queue Bot Commands:\n"
             "- Type `book` to reserve a slot\n"
             "- Type `queue` to view your position\n"
             "- Type `cancel` to cancel your booking"
